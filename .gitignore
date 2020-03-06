@@ -1,0 +1,6 @@
+/.vscode/
+/.settings/
+/target/
+/settings.json
+.DS_Store
+/logs/
