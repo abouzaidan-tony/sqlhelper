@@ -351,8 +351,8 @@ public class EntityManager {
             insert(object);
         else
             update(object);
-        cacheManager.put(clazz, object);
         executeToRelatedObjects(object, s -> persist(s, accessNumber), false);
+        cacheManager.put(clazz, object);
     }
 
     private void persist(JoinObject obj) throws SQLException {

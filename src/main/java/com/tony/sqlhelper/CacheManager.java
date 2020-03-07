@@ -70,19 +70,18 @@ class CacheManager {
         cachedObjects.get(clazz).remove(key);
     };
 
-    public Object fetchFromTempMemory(Class<?> clazz, Object key){
-       
+    public Object fetchFromTempMemory(Class<?> clazz, Object key) {
+
         MemoryCache tempCache = null;
         ClassCache classCache = null;
 
-        do{
+        do {
 
             tempCache = this.tempCache.get(this.state);
 
             if (tempCache == null)
                 break;
 
-            
             classCache = tempCache.get(clazz);
 
             if (classCache == null)
@@ -94,15 +93,15 @@ class CacheManager {
                 break;
 
             return obj;
-            
-        }while(false);
+
+        } while (false);
 
         Object obj = fetch(clazz, key, true);
 
-        if(obj == null)
+        if (obj == null)
             return null;
 
-        obj = ((ProxySQLObject)obj).cloneObj();
+        obj = ((ProxySQLObject) obj).cloneObj();
 
         put(clazz, obj, false);
         return obj;
@@ -133,10 +132,10 @@ class CacheManager {
 
     private void put(Class<?> clazz, Object obj, boolean append) {
         if (transactionMode) {
-            if (append){
+            if (append) {
                 addQueueAction(clazz, obj, persistObject);
             }
-                
+
             MemoryCache tempMemoryCache = tempCache.get(this.state);
             if (tempMemoryCache == null) {
                 tempMemoryCache = new MemoryCache();
@@ -148,13 +147,13 @@ class CacheManager {
         }
     }
 
-    private void addQueueAction(Class<?> clazz, Object obj, BiConsumer<Object, Object> action){
+    private void addQueueAction(Class<?> clazz, Object obj, BiConsumer<Object, Object> action) {
         Queue<QueueEntry> q = queuedActions.get(state);
         if (q == null) {
             q = new LinkedList<>();
             queuedActions.put(state, q);
         }
-        q.add(new QueueEntry(clazz, obj, action));
+        q.add(new QueueEntry(clazz, ((ProxySQLObject) obj).cloneObj(), action));
     }
 
     public boolean isTransactionMode() {
@@ -167,11 +166,11 @@ class CacheManager {
 
     public void commit() {
         for (Entry<Integer, Queue<QueueEntry>> q : queuedActions.entrySet()) {
-            for(QueueEntry qe : q.getValue()){
+            for (QueueEntry qe : q.getValue()) {
                 qe.operation.accept(qe.clazz, qe.object);
             }
         }
-            
+
         rolllback();
     }
 
@@ -212,7 +211,7 @@ class CacheManager {
         tempCache.put(state, memoryCache);
 
         memoryCache = new MemoryCache();
-        
+
         ClassCache prevClassCache;
         for (Entry<Class<?>, ClassCache> classCache : curMemoryCache.entrySet()) {
             memoryCache.put(classCache.getKey(), new ClassCache());
@@ -221,12 +220,12 @@ class CacheManager {
                 prevClassCache.put(e.getKey(), ((ProxySQLObject) e.getValue()).cloneObj());
             }
         }
-        
+
         tempCache.put(fromState, memoryCache);
 
     }
 
-    public void invalidateCache(){
+    public void invalidateCache() {
         rolllback();
     }
 }

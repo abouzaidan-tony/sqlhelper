@@ -35,59 +35,54 @@ public class AppTest {
     }
 
     @Test
-    public void rollingBack() throws ClassNotFoundException, SQLException {
+    public void rollingBack() throws Exception {
         Customer c = null;
        
-        try{
-
-            EntityManager em = EntityManager.GetInstance();
-            Savepoint sp = null;
-                
-            em.beginTransaction();
-            c = em.GetRepository(Customer.class).create();
-            if (c instanceof ProxySQLObject)
-                ((ProxySQLObject) c).getAccessNumber();
-            c.setFirstName("Tony");
-            c.setLastName("A. Z");
-            Address address = em.GetRepository(Address.class).create();
-            PhoneNumber p1 = em.GetRepository(PhoneNumber.class).create();
-            p1.setPhoneNumber("1111");
-            c.getPhoneNumbers().add(p1);
-            address.setFullAddress("this is my full address");
-            c.setAddress(address);
-            em.persist(c);
-            sp = em.setSavePoint();
-            c = em.GetRepository(Customer.class).find(c.getId());
-            assertTrue(c != null);
-            c.setFirstName("Tony2");
-            assertTrue(c.getAddress() != null);
-            assertTrue(c.getPhoneNumbers().size() == 1);
-            PhoneNumber p2 = em.GetRepository(PhoneNumber.class).create();
-            p2.setPhoneNumber("2222");
-            c.getPhoneNumbers().add(p2);
-            em.persist(c);
-            c = em.GetRepository(Customer.class).find(c.getId());
-            assertTrue(c.getFirstName().equals("Tony2")); 
-            assertTrue(c.getPhoneNumbers().size() == 2);
-            assertTrue(c.getPhoneNumbers().get(0).getPhoneNumber().equals("1111"));
-            assertTrue(c.getPhoneNumbers().get(1).getPhoneNumber().equals("2222"));
-
-            em.rollBack(sp);
-
-            c = em.GetRepository(Customer.class).find(c.getId());
-            assertTrue(c != null);
-            assertTrue(c.getFirstName().equals("Tony"));
-            assertTrue(c.getPhoneNumbers().size() == 1);
-            assertTrue(c.getPhoneNumbers().get(0).getPhoneNumber().equals("1111"));
+        EntityManager em = EntityManager.GetInstance();
+        Savepoint sp = null;
             
-            em.rollBack();
-        
-            c = em.GetRepository(Customer.class).find(c.getId());
-            assertTrue(c == null);
+        em.beginTransaction();
+        c = em.GetRepository(Customer.class).create();
+        if (c instanceof ProxySQLObject)
+            ((ProxySQLObject) c).getAccessNumber();
+        c.setFirstName("Tony");
+        c.setLastName("A. Z");
+        Address address = em.GetRepository(Address.class).create();
+        PhoneNumber p1 = em.GetRepository(PhoneNumber.class).create();
+        p1.setPhoneNumber("1111");
+        c.getPhoneNumbers().add(p1);
+        address.setFullAddress("this is my full address");
+        c.setAddress(address);
+        em.persist(c);
+        sp = em.setSavePoint();
+        c = em.GetRepository(Customer.class).find(c.getId());
+        assertTrue(c != null);
+        c.setFirstName("Tony2");
+        assertTrue(c.getAddress() != null);
+        assertTrue(c.getPhoneNumbers().size() == 1);
+        PhoneNumber p2 = em.GetRepository(PhoneNumber.class).create();
+        p2.setPhoneNumber("2222");
+        c.getPhoneNumbers().add(p2);
+        em.persist(c);
+        c = em.GetRepository(Customer.class).find(c.getId());
+        assertTrue(c.getFirstName().equals("Tony2")); 
+        assertTrue(c.getPhoneNumbers().size() == 2);
+        assertTrue(c.getPhoneNumbers().get(0).getPhoneNumber().equals("1111"));
+        assertTrue(c.getPhoneNumbers().get(1).getPhoneNumber().equals("2222"));
 
-        }catch(Exception ex){
-            ex.printStackTrace();
-        }
+        em.rollBack(sp);
+
+        c = em.GetRepository(Customer.class).find(c.getId());
+        assertTrue(c != null);
+        assertTrue(c.getFirstName().equals("Tony"));
+        assertTrue(c.getPhoneNumbers().size() == 1);
+        assertTrue(c.getPhoneNumbers().get(0).getPhoneNumber().equals("1111"));
+        
+        em.rollBack();
+    
+        c = em.GetRepository(Customer.class).find(c.getId());
+        assertTrue(c == null);
+
     }
 
     @Test
