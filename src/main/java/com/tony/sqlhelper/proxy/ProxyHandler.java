@@ -150,7 +150,7 @@ public class ProxyHandler<T> implements MethodHandler {
                 } else if (annotation instanceof ManyToOne) {
                     f.set(self, em.GetRepository(((OneToOne) annotation).targetEntity()).find(cache));
                 } else if (annotation instanceof OneToMany) {
-                    fillListFromCache(self, f, ((ManyToMany) annotation).targetEntity(), (List<Object>) cache);
+                    fillListFromCache(self, f, ((OneToMany) annotation).targetEntity(), (List<Object>) cache);
                 } else if (annotation instanceof OneToOne) {
                     f.set(self, em.GetRepository(((OneToOne)annotation).targetEntity()).find(cache));
                 }
@@ -234,7 +234,7 @@ public class ProxyHandler<T> implements MethodHandler {
             setMapValueToNull(a.inverserdBy());
             Object extVal = f.get(self);
             if (extVal != null) {
-                List<Object> l = (List<Object>) getter.invoke(val);
+                List<Object> l = (List<Object>) getter.invoke(extVal);
                 if (l == null)
                     return;
                 ((ProxyList<Object>) l).disablePropagation().remove(self);
