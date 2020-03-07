@@ -253,9 +253,11 @@ public class EntityManager {
     }
 
     @SuppressWarnings("unchecked")
-    private void executeToRelatedObjects(Object obj, SQLExceptionConsumer<Object> consumer) throws SQLException {
+    private void executeToRelatedObjects(Object obj, SQLExceptionConsumer<Object> consumer, boolean isDeletion) throws SQLException {
         List<PropertyMap> ps = new ArrayList<>(SchemaHelper.getOneToOneColumns((Class<?>) obj.getClass()));
         for (PropertyMap p : ps) {
+            if(p.columnName.length() != 0 && isDeletion) //is not main object
+                continue;
             p.field.setAccessible(true);
             try {
                 consumer.accept(p.field.get(obj));
@@ -279,25 +281,29 @@ public class EntityManager {
 
         ps = SchemaHelper.getManyToManyColumns((Class<?>) obj.getClass());
         JoinObject joinObj;
-        ProxyList<Object>.Change c;
+        ProxyList<Object>.Change c = null;
         for (PropertyMap p : ps) {
             p.field.setAccessible(true);
             try {
                 ProxyList<Object> o = (ProxyList<Object>) p.field.get(obj);
                 if (o != null) {
-                    for (Object e :  o){
-                        consumer.accept(e);
+                    for (Object e :  o) {
+                        if(!isDeletion)
+                            consumer.accept(e);
                         int i = o.getChanges().indexOf(e);
                         if(i<0)
                             continue;
-                        c = o.getChanges().get(i);
+                        if(!isDeletion)
+                            c = o.getChanges().get(i);
                         joinObj = new JoinObject(p.field.getAnnotation(ManyToMany.class), obj, e);
-                        if(c.action == 1)
+                        if(c != null && c.action == 1)
                             persist(joinObj);
                         else
                             delete(joinObj);
                     }
                     o.getChanges().clear();
+                    if(isDeletion)
+                        o.clear();
                 }
             } catch (IllegalArgumentException | IllegalAccessException e) {
                 log.error("Cannot set Primary key for class [" + obj.getClass() + "]", e);
@@ -346,7 +352,7 @@ public class EntityManager {
         else
             update(object);
         cacheManager.put(clazz, object);
-        executeToRelatedObjects(object, s -> persist(s, accessNumber));
+        executeToRelatedObjects(object, s -> persist(s, accessNumber), false);
     }
 
     private void persist(JoinObject obj) throws SQLException {
@@ -378,7 +384,7 @@ public class EntityManager {
         delete(object, getRand());
     }
 
-    public void delete(Object object, long accessNumber) throws SQLException {
+    private void delete(Object object, long accessNumber) throws SQLException {
         if (object == null) {
             log.warn("update null obj");
             return;
@@ -392,7 +398,7 @@ public class EntityManager {
             return;
         }
 
-        executeToRelatedObjects(object, s -> delete(s, accessNumber));
+        executeToRelatedObjects(object, s -> delete(s, accessNumber), true);
         delete(object);
         return;
     }

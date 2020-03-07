@@ -228,6 +228,8 @@ public class AppTest {
 
         EntityManager.GetInstance().commit();
 
+        EntityManager.GetInstance().beginTransaction();
+
         a1 = EntityManager.GetInstance().GetRepository(Author.class).find(a1.getId());
         assertTrue(a1.getBooks().size() == 3);
         b1 = EntityManager.GetInstance().GetRepository(Book.class).find(b1.getId());
@@ -236,5 +238,11 @@ public class AppTest {
         assertTrue(b1.getAuthors().size() == 3);
 
         assertTrue(b2.getAuthors().size() == 1);
+
+        EntityManager.GetInstance().remove(a1);
+
+        assertTrue(b1.getAuthors().size() == 2);
+
+        EntityManager.GetInstance().commit();
     }
 }
