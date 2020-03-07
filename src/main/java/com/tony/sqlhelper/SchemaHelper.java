@@ -2,6 +2,7 @@ package com.tony.sqlhelper;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.lang.reflect.ParameterizedType;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -75,7 +76,7 @@ public class SchemaHelper {
     };
 
     private static BiFunction<Field, ManyToMany, PropertyMap> ManyToManyBiFunction = (f, a) -> {
-        return new PropertyMap(f, a.mappedBy(), a.inversedBy(), a.joinTable(), a.targetEntity(), SQLTypes.Long);
+        return new PropertyMap(f, a.referencedBy(), a.inversedBy(), a.joinTable(), a.targetEntity(), SQLTypes.Long);
     };
 
     private static BiFunction<Field, ManyToOne, PropertyMap> ManyToOneBiFunction = (f, a) -> {
@@ -220,6 +221,29 @@ public class SchemaHelper {
         } while (clazz != null);
 
         return myField;
+    }
+
+    public static Method getGetterForField(Field f, Class<?> clazz) {
+
+        Method myMethod = null;
+
+        do {
+            for (Method m : clazz.getDeclaredMethods()) {
+                if (!(m.getReturnType().equals(f.getType())))
+                    continue;
+                
+                if (!m.getName().toLowerCase().endsWith(f.getName().toLowerCase()))
+                    continue;
+                myMethod = m;
+                myMethod.setAccessible(true);
+                clazz = null;
+                break;
+            }
+            if (clazz != null)
+                clazz = clazz.getSuperclass();
+        } while (clazz != null);
+
+        return myMethod;
     }
 
     public static Field getListRelatedField(Class<?> type, String name, Class<?> clazz) {

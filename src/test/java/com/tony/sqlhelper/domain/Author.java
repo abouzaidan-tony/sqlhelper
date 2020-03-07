@@ -19,7 +19,7 @@ public class Author {
     @Property(name="name")
     private String name;
 
-    @ManyToMany(targetEntity = Book.class, mappedBy = "author_id", inversedBy = "book_id", joinTable = "author_book")
+    @ManyToMany(targetEntity = Book.class, referencedBy = "author_id", inversedBy = "book_id", joinTable = "author_book")
     private List<Book> books;
 
     public Long getId() {

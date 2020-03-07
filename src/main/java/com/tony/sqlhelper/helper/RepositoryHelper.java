@@ -19,8 +19,14 @@ public class RepositoryHelper {
 
     public static <T> void fillOneToManyReferences(EntityManager em, T obj, PropertyMap p) {
         try {
-            List<?> list = em.GetRepository(p.clazz)
-                    .findBy(Arrays.asList(new FilterTuple(p.columnName, SQLObjectHelper.getKeyValue(obj))));
+            Object key = SQLObjectHelper.getKeyValue(obj);
+            
+            List<?> list;
+            if(key != null)
+                list = em.GetRepository(p.clazz)
+                    .findBy(Arrays.asList(new FilterTuple(p.columnName, key)));
+            else
+                list = new ProxyList<>();
             SQLObjectHelper.setPropertyValue(obj, p.field, list);
             ((ProxyList<?>) list).setTarget(obj, ProxyList.relationOneToMany);
         } catch (IllegalArgumentException | IllegalAccessException e) {
@@ -39,13 +45,16 @@ public class RepositoryHelper {
 
     public static <T> void fillOneToOneReferences(EntityManager em, T obj, PropertyMap p) {
         try {
+            Object key = SQLObjectHelper.getKeyValue(obj);
+            if(key == null)
+                return;
             Object res = null;
             if (!p.columnName.equals("")) {
                 Object identifier = SQLObjectHelper.getMapField(obj, p.columnName);
                 res = em.GetRepository(p.clazz).find(identifier);
             } else {
                 res = em.GetRepository(p.clazz).findOneBy(
-                        Arrays.asList(new FilterTuple(p.inversedColumnName, SQLObjectHelper.getKeyValue(obj))));
+                        Arrays.asList(new FilterTuple(p.inversedColumnName, key)));
             }
             SQLObjectHelper.setPropertyValue(obj, p.field, res);
         } catch (IllegalArgumentException | IllegalAccessException e) {
@@ -54,12 +63,18 @@ public class RepositoryHelper {
 
     public static <T> void fillManyToManyReferences(EntityManager em, T obj, PropertyMap p) {
         try {
+           
+            Object key = SQLObjectHelper.getKeyValue(obj);
             String targetPrimaryKey = SchemaHelper.getPrimaryKey(p.clazz).columnName;
             String tableName = SchemaHelper.getTableName(p.clazz);
-            List<?> l = em.GetRepository(p.clazz)
+            List<?> l;
+            if(key != null)
+                l = em.GetRepository(p.clazz)
                     .Join(new JoinTuple("INNER JOIN", p.tableName,
                             tableName + "." + targetPrimaryKey + " = " + p.tableName + "." + p.inversedColumnName))
-                    .findBy(Arrays.asList(new FilterTuple(p.columnName, SQLObjectHelper.getKeyValue(obj))));
+                    .findBy(Arrays.asList(new FilterTuple(p.columnName, key )));
+            else
+                l = new ProxyList<>();
             ((ProxyList<?>) l).setTarget(obj, ProxyList.relationManyToMany);
             SQLObjectHelper.setPropertyValue(obj, p.field, l);
         } catch (IllegalArgumentException | IllegalAccessException e) {

@@ -10,7 +10,7 @@ import java.lang.annotation.Target;
 public @interface ManyToMany{
     Class<?> targetEntity();
 
-    String mappedBy();
+    String referencedBy();
 
     String inversedBy();
 

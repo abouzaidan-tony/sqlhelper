@@ -171,6 +171,8 @@ public class AppTest {
 
     @Test
     public void testManyToMany() throws Exception {
+        EntityManager.GetInstance().beginTransaction();
+
         Book b1 = EntityManager.GetInstance().GetRepository(Book.class).create();
         b1.setName("Book1");
         Book b2 = EntityManager.GetInstance().GetRepository(Book.class).create();
@@ -191,8 +193,48 @@ public class AppTest {
 
         assertTrue(b2.getAuthors().size() == 1);
 
+        EntityManager em = EntityManager.GetInstance();
+
+        EntityManager.GetInstance().persist(b1);
+        EntityManager.GetInstance().persist(b2);
+
+        Savepoint sp = EntityManager.GetInstance().setSavePoint();
+
         b1.getAuthors().remove(a1);
 
         assertTrue(a1.getBooks().size() == 1);
+
+        EntityManager.GetInstance().rollBack(sp);
+
+
+        a1 = EntityManager.GetInstance().GetRepository(Author.class).find(a1.getId());
+        assertTrue(a1.getBooks().size() == 2);
+        b1 = EntityManager.GetInstance().GetRepository(Book.class).find(b1.getId());
+        b2 = EntityManager.GetInstance().GetRepository(Book.class).find(b2.getId());
+
+        Book b3 = EntityManager.GetInstance().GetRepository(Book.class).create();
+        b3.setName("b3");
+        a1.getBooks().add(b3);
+
+        Author a3 = EntityManager.GetInstance().GetRepository(Author.class).create();
+        a3.getBooks().add(b1);
+        a3.setName("A4");
+
+        assertTrue(b1.getAuthors().size() == 3);
+
+        assertTrue(b2.getAuthors().size() == 1);
+
+        em.persist(a3);
+
+        EntityManager.GetInstance().commit();
+
+        a1 = EntityManager.GetInstance().GetRepository(Author.class).find(a1.getId());
+        assertTrue(a1.getBooks().size() == 3);
+        b1 = EntityManager.GetInstance().GetRepository(Book.class).find(b1.getId());
+        b2 = EntityManager.GetInstance().GetRepository(Book.class).find(b2.getId());
+
+        assertTrue(b1.getAuthors().size() == 3);
+
+        assertTrue(b2.getAuthors().size() == 1);
     }
 }

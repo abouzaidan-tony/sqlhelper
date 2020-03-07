@@ -46,7 +46,7 @@ class CacheManager {
 
     private HashMap<Integer, MemoryCache> tempCache;
 
-    private Queue<QueueEntry> queuedActions;
+    private HashMap<Integer, Queue<QueueEntry>> queuedActions;
 
     private boolean transactionMode;
 
@@ -55,7 +55,7 @@ class CacheManager {
     public CacheManager() {
         transactionMode = false;
         state = -1;
-        queuedActions = new LinkedList<>();
+        queuedActions = new HashMap<>();
         tempCache = new HashMap<>();
         cachedObjects = new MemoryCache();
     }
@@ -92,6 +92,8 @@ class CacheManager {
 
             if (obj == null)
                 break;
+
+            return obj;
             
         }while(false);
 
@@ -131,8 +133,10 @@ class CacheManager {
 
     private void put(Class<?> clazz, Object obj, boolean append) {
         if (transactionMode) {
-            if (append)
-                queuedActions.add(new QueueEntry(clazz, obj, persistObject));
+            if (append){
+                addQueueAction(clazz, obj, persistObject);
+            }
+                
             MemoryCache tempMemoryCache = tempCache.get(this.state);
             if (tempMemoryCache == null) {
                 tempMemoryCache = new MemoryCache();
@@ -144,6 +148,15 @@ class CacheManager {
         }
     }
 
+    private void addQueueAction(Class<?> clazz, Object obj, BiConsumer<Object, Object> action){
+        Queue<QueueEntry> q = queuedActions.get(state);
+        if (q == null) {
+            q = new LinkedList<>();
+            queuedActions.put(state, q);
+        }
+        q.add(new QueueEntry(clazz, obj, action));
+    }
+
     public boolean isTransactionMode() {
         return transactionMode;
     }
@@ -153,15 +166,18 @@ class CacheManager {
     }
 
     public void commit() {
-        for (QueueEntry q : queuedActions) {
-            q.operation.accept(q.clazz, q.object);
+        for (Entry<Integer, Queue<QueueEntry>> q : queuedActions.entrySet()) {
+            for(QueueEntry qe : q.getValue()){
+                qe.operation.accept(qe.clazz, qe.object);
+            }
         }
+            
         rolllback();
     }
 
     public void remove(Class<?> clazz, Object object) {
         if (transactionMode) {
-            queuedActions.add(new QueueEntry(clazz, object, removeObject));
+            addQueueAction(clazz, object, removeObject);
         } else {
             removeObject.accept(clazz, object);
         }
@@ -169,11 +185,14 @@ class CacheManager {
 
     public void rolllback() {
         state = 0;
+        transactionMode = false;
         tempCache.clear();
+        queuedActions.clear();
     }
 
     public void rolllback(int state) {
-        while (this.state > state) {
+        while (this.state >= state) {
+            queuedActions.remove(this.state);
             tempCache.remove(this.state--);
         }
     }
@@ -202,5 +221,12 @@ class CacheManager {
                 prevClassCache.put(e.getKey(), ((ProxySQLObject) e.getValue()).cloneObj());
             }
         }
+        
+        tempCache.put(fromState, memoryCache);
+
+    }
+
+    public void invalidateCache(){
+        rolllback();
     }
 }

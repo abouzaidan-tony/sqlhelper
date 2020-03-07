@@ -85,6 +85,8 @@ public class ProxyHandler<T> implements MethodHandler {
     private Object overrideEquals(Object self, Method thisMethod, Method proceed, Object[] args)
             throws IllegalAccessException, IllegalArgumentException, InvocationTargetException {
 
+        if(args[0] == null)
+                return false;
         if (self.getClass().equals(args[0].getClass())) {
             Object key1 = SQLObjectHelper.getKeyValue(self);
             ProxyHandler<Object> proxy = SQLObjectHelper.getHandler(args[0]);
@@ -168,9 +170,8 @@ public class ProxyHandler<T> implements MethodHandler {
         ProxyList<Object> l = new ProxyList<>().setTarget(self, ProxyList.relationManyToMany);
         f.set(self, l);
         for (Object o : identifiers) {
-            l.add(em.GetRepository(targetEntity).find(o));
+            l.disablePropagation().add(em.GetRepository(targetEntity).find(o));
         }
-        l.disablePropagation().add(self);
     }
 
     private Object overrideSetters(Object self, Method thisMethod, Method proceed, Object[] args) throws Throwable {
@@ -192,7 +193,7 @@ public class ProxyHandler<T> implements MethodHandler {
     }
 
     private void setParameterValue(Object self, Field f, Object val)
-            throws IllegalArgumentException, IllegalAccessException {
+            throws IllegalArgumentException, IllegalAccessException, InvocationTargetException {
         for (Annotation a : f.getAnnotations()) {
             if (a instanceof OneToOne) {
                 handleOneToOneRelation(self, f, val, (OneToOne) a);
@@ -218,11 +219,12 @@ public class ProxyHandler<T> implements MethodHandler {
 
     @SuppressWarnings("unchecked")
     private void handleManyToOneRelation(Object self, Field f, Object val, ManyToOne a)
-            throws IllegalArgumentException, IllegalAccessException {
+            throws IllegalArgumentException, IllegalAccessException, InvocationTargetException {
         Field f2 = SchemaHelper.getListRelatedField(clazz, null, a.targetEntity());
         f2.setAccessible(true);
+        Method getter = SchemaHelper.getGetterForField(f2, a.targetEntity());
         if (val != null) {
-            List<Object> l = (List<Object>) f2.get(val);
+            List<Object> l = (List<Object>) getter.invoke(val);
             if (l == null) {
                 l = new ProxyList<>().setTarget(val, ProxyList.relationOneToMany);
                 f2.set(val, l);
@@ -232,7 +234,7 @@ public class ProxyHandler<T> implements MethodHandler {
             setMapValueToNull(a.inverserdBy());
             Object extVal = f.get(self);
             if (extVal != null) {
-                List<Object> l = (List<Object>) f2.get(extVal);
+                List<Object> l = (List<Object>) getter.invoke(val);
                 if (l == null)
                     return;
                 ((ProxyList<Object>) l).disablePropagation().remove(self);

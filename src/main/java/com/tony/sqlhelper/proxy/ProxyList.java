@@ -1,6 +1,7 @@
 package com.tony.sqlhelper.proxy;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -11,11 +12,53 @@ import com.tony.sqlhelper.helper.SQLObjectHelper;
 
 public class ProxyList<T> extends ArrayList<T> {
 
+    public class Change {
+        public int action;
+        public Object obj;
+
+        @Override
+        public boolean equals(Object obj) {
+            return this.obj.equals(obj);
+        }
+    }
+
+    public class ChangeList extends ArrayList<Change> {
+
+        private static final long serialVersionUID = 765143392278436238L;
+
+        @Override
+        public boolean add(ProxyList<T>.Change e) {
+            if(e == null)
+                return false;
+            int index = indexOf(e.obj);
+            if (index == -1)
+                return super.add(e);
+            Change c = get(index);
+            if (c.action == e.action)
+                return false;
+            super.remove(index);
+            return true;
+        }
+
+        @Override
+        public int indexOf(Object o) {
+            for(int i=0; i<this.size(); i++){
+                Object elem = get(i);
+                if(elem == null && o == null)
+                    return i;
+                if(elem != null && elem.equals(o))
+                    return i;
+            }
+            return -1;
+        }
+    }
+
     public static byte relationOneToMany = 0;
     public static byte relationManyToMany = 1;
     private Object target;
     private Class<?> clazz;
     private byte relation;
+    private ChangeList changes;
 
     private boolean disablePropagation = false;
 
@@ -25,6 +68,8 @@ public class ProxyList<T> extends ArrayList<T> {
         this.target = target;
         this.clazz = ((ProxySQLObject) target).getEntityClass();
         this.relation = relation;
+        if(this.relation == relationManyToMany)
+            changes = new ChangeList();
         return this;
     }
 
@@ -35,7 +80,7 @@ public class ProxyList<T> extends ArrayList<T> {
 
     @Override
     public boolean add(T e) {
-        if(relation == relationOneToMany)
+        if (relation == relationOneToMany)
             addCompleteManyToOne(e);
         else
             addCompleteManyToMany(e);
@@ -45,11 +90,12 @@ public class ProxyList<T> extends ArrayList<T> {
 
     // filled when calling add on onetomany
     private void addCompleteManyToOne(T object) {
-        if(disablePropagation || target == null)
+        if (disablePropagation || target == null || object == null)
             return;
-        Class<?> objClazz = object instanceof ProxySQLObject ? ((ProxySQLObject)object).getEntityClass() : object.getClass();
+        Class<?> objClazz = object instanceof ProxySQLObject ? ((ProxySQLObject) object).getEntityClass()
+                : object.getClass();
         Field f = SchemaHelper.getRelatedField(clazz, null, objClazz);
-        
+
         if (f == null)
             return;
         try {
@@ -61,16 +107,20 @@ public class ProxyList<T> extends ArrayList<T> {
 
     @SuppressWarnings("unchecked")
     private void addCompleteManyToMany(T object) {
-        if(disablePropagation || target == null)
+        if (disablePropagation || target == null || object == null)
             return;
+        Change c = new Change();
+        c.action = 1; //add
+        c.obj = object;
+        changes.add(c);
         Class<?> objClazz = object instanceof ProxySQLObject ? ((ProxySQLObject) object).getEntityClass()
                 : object.getClass();
         Field f = SchemaHelper.getListRelatedField(clazz, null, objClazz);
-
         if (f == null)
             return;
+        Method getter = SchemaHelper.getGetterForField(f, objClazz);
         try {
-            List<Object> l = (List<Object>) f.get(object);
+            List<Object> l = (List<Object>) getter.invoke(object);
             if (l == null) {
                 l = new ProxyList<>().setTarget(object, relationManyToMany);
                 f.set(object, l);
@@ -93,7 +143,7 @@ public class ProxyList<T> extends ArrayList<T> {
 
     @Override
     public boolean addAll(Collection<? extends T> c) {
-        for(T e : c){
+        for (T e : c) {
             if (relation == relationOneToMany)
                 addCompleteManyToOne(e);
             else
@@ -117,7 +167,7 @@ public class ProxyList<T> extends ArrayList<T> {
 
     @Override
     public void clear() {
-        if(relation == relationOneToMany)
+        if (relation == relationOneToMany)
             clearCompleteManyToOne();
         else
             clearCompleteManyToMany();
@@ -128,9 +178,9 @@ public class ProxyList<T> extends ArrayList<T> {
     @Override
     public boolean remove(Object o) {
         int index = indexOf(o);
-        if(index == -1)
+        if (index == -1)
             return false;
-        if(relation == relationOneToMany)
+        if (relation == relationOneToMany)
             removeCompleteManyToOne(get(index));
         else
             removeCompleteManyToMany(get(index));
@@ -140,9 +190,7 @@ public class ProxyList<T> extends ArrayList<T> {
     }
 
     private void removeCompleteManyToOne(T object) {
-        if (disablePropagation)
-            return;
-        if (object == null)
+        if (disablePropagation || target == null || object == null)
             return;
         Class<?> objClazz = object instanceof ProxySQLObject ? ((ProxySQLObject) object).getEntityClass()
                 : object.getClass();
@@ -160,27 +208,30 @@ public class ProxyList<T> extends ArrayList<T> {
     }
 
     private void clearCompleteManyToOne() {
-        if (disablePropagation)
+        if (disablePropagation || target == null)
             return;
         for (T o : this)
             removeCompleteManyToOne(o);
-        
+
     }
 
     @SuppressWarnings("unchecked")
     private void removeCompleteManyToMany(T object) {
-        if (disablePropagation)
+        if (disablePropagation || target == null || object == null)
             return;
-        if (object == null)
-            return;
+        Change c = new Change();
+        c.action = 0; //remove
+        c.obj = object;
+        changes.add(c);
         Class<?> objClazz = object instanceof ProxySQLObject ? ((ProxySQLObject) object).getEntityClass()
                 : object.getClass();
         Field f = SchemaHelper.getListRelatedField(clazz, null, objClazz);
 
         if (f == null)
             return;
+        Method getter = SchemaHelper.getGetterForField(f, objClazz);
         try {
-            List<Object> l = (List<Object>) f.get(object);
+            List<Object> l = (List<Object>) getter.invoke(object);
             if (l == null) {
                 l = new ProxyList<>().setTarget(object, relationManyToMany);
                 f.set(object, l);
@@ -195,15 +246,19 @@ public class ProxyList<T> extends ArrayList<T> {
     private void clearCompleteManyToMany() {
         if (disablePropagation)
             return;
-        for(T o : this)
+        for (T o : this)
             removeCompleteManyToMany(o);
     }
 
-    List<Object> getIdentifiers(){
+    List<Object> getIdentifiers() {
         List<Object> identifiers = new ArrayList<>();
-        for(T o : this){
+        for (T o : this) {
             identifiers.add(SQLObjectHelper.getKeyValue(o));
         }
         return identifiers;
+    }
+
+    public ChangeList getChanges() {
+        return changes;
     }
 }
